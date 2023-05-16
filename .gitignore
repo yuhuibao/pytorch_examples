@@ -21,3 +21,9 @@ docs/venv
 # development
 .vscode
 **/.DS_Store
+
+checkpoint.pt
+*.sqlite
+*.nsys-rep
+*.ncu-rep
+slurm-sample*
