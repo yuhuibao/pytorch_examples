@@ -88,6 +88,9 @@ def dataprocess():
     def myFunc(e):
         return e["ts"]
 
+    def myFunc1(e):
+        return e["starttime"]
+
     traceevents = json_trace["traceEvents"]
     traceevents.sort(key=myFunc)
 
@@ -226,8 +229,17 @@ def dataprocess():
             cpueventsitem.kernelids,
         )
         operatorid += 1
+        infoevents = []
 
-        # for allocevent in cpueventsitem.allocevents:
+        for allocevent in cpueventsitem.allocevents:
+            a = {
+                "starttime": allocevent["ts"] - profilerstarttime,
+                "info": {
+                    "address": hex(allocevent["args"]["Addr"]),
+                    "size": allocevent["args"]["Bytes"],
+                },
+            }
+            infoevents.append(a)
         #     print(
         #         file,
         #         ",",
@@ -242,22 +254,18 @@ def dataprocess():
 
         for i, cudaeventsitem in enumerate(cpueventsitem.cudaevents):
             k = {
-                "kernelid": cpueventsitem.kernelids[i],
-                "cudatime": cudatime,
-                "cudatimeoverlap": cudatimenooverlap,
-                "kernelname": cudaeventsitem.name.replace(",", ";"),
+                "starttime": cudaeventsitem.starttime - profilerstarttime,
+                "info": {
+                    "kernelid": cpueventsitem.kernelids[i],
+                    "cudatime": cudatime,
+                    "cudatimeoverlap": cudatimenooverlap,
+                    "kernelname": cudaeventsitem.name.replace(",", ";"),
+                },
             }
-            print(k)
-
-        # print(
-        #     kernelid,
-        #     ",",
-        #     cudatime,
-        #     ",",
-        #     cudatimenooverlap,
-        #     ",",
-        #     cudaeventsitem.name.replace(",", ";"),
-        # )
+            infoevents.append(k)
+        infoevents.sort(key=myFunc1)
+        for e in infoevents:
+            print(e)
 
 
 if __name__ == "__main__":
