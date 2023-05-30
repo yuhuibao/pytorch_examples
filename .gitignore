@@ -27,3 +27,4 @@ checkpoint.pt
 *.nsys-rep
 *.ncu-rep
 slurm-sample*
+*.json

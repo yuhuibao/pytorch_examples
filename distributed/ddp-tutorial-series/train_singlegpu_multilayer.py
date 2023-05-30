@@ -2,6 +2,30 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from datautils import MyTrainDataset
+import torch.profiler
+import torch.nn as nn
+import torchvision.transforms as transforms
+import torchvision
+
+
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = torch.flatten(x, 1)  # flatten all dimensions except batch
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 
 class Trainer:
@@ -31,10 +55,22 @@ class Trainer:
         print(
             f"[GPU{self.gpu_id}] Epoch {epoch} | Batchsize: {b_sz} | Steps: {len(self.train_data)}"
         )
-        for source, targets in self.train_data:
-            source = source.to(self.gpu_id)
-            targets = targets.to(self.gpu_id)
-            self._run_batch(source, targets)
+        with torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+        ) as prof:
+            for step, data in enumerate(self.train_data):
+                if step >= 1:
+                    break
+                source = data[0].to(self.gpu_id)
+                targets = data[1].to(self.gpu_id)
+                self._run_batch(source, targets)
+        prof.export_chrome_trace("trace.json")
 
     def _save_checkpoint(self, epoch):
         ckp = self.model.state_dict()
@@ -45,15 +81,28 @@ class Trainer:
     def train(self, max_epochs: int):
         for epoch in range(max_epochs):
             self._run_epoch(epoch)
-            if epoch % self.save_every == 0:
-                self._save_checkpoint(epoch)
+            # if epoch % self.save_every == 0:
+            #     self._save_checkpoint(epoch)
 
 
 def load_train_objs():
-    train_set = MyTrainDataset(32)  # load your dataset
-    model = torch.nn.Linear(20, 1)  # load your model
+    # train_set = MyTrainDataset(2048)  # load your dataset
+    # model = torch.nn.Linear(20, 1)  # load your model
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+    )
+
+    batch_size = 32
+
+    trainset = torchvision.datasets.CIFAR10(
+        root="./data", train=True, download=True, transform=transform
+    )
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=batch_size, shuffle=True, num_workers=2
+    )
+    model = Net()
     optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
-    return train_set, model, optimizer
+    return trainloader, model, optimizer
 
 
 def prepare_dataloader(dataset: Dataset, batch_size: int):
@@ -61,8 +110,8 @@ def prepare_dataloader(dataset: Dataset, batch_size: int):
 
 
 def main(device, total_epochs, save_every, batch_size):
-    dataset, model, optimizer = load_train_objs()
-    train_data = prepare_dataloader(dataset, batch_size)
+    train_data, model, optimizer = load_train_objs()
+    # train_data = prepare_dataloader(dataset, batch_size)
     trainer = Trainer(model, train_data, optimizer, device, save_every)
     trainer.train(total_epochs)
 

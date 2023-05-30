@@ -16,6 +16,6 @@ echo "CUDA_VISIBLE_DEVICES:"
 echo $CUDA_VISIBLE_DEVICES
 
 echo "start python script:"
-python /home/yuhui/dev/src/github.com/examples/distributed/ddp-tutorial-series/train_singlegpu.py 1 10
+python /home/yuhui/dev/src/github.com/examples/distributed/ddp-tutorial-series/single_gpu.py 1 10
 
 echo "done."
