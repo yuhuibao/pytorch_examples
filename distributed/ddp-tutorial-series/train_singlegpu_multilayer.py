@@ -60,9 +60,9 @@ class Trainer:
                 torch.profiler.ProfilerActivity.CPU,
                 torch.profiler.ProfilerActivity.CUDA,
             ],
-            record_shapes=True,
+            #record_shapes=True,
             profile_memory=True,
-            with_stack=True,
+            #with_stack=True,
         ) as prof:
             for step, data in enumerate(self.train_data):
                 if step >= 1:
