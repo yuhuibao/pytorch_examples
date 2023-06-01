@@ -30,7 +30,8 @@ class Operator:
         self.cudaevents = []
         self.inputdims = ""
         self.allocevents = []
-        self.infoeventids = []
+        self.kernelids = []
+        self.allocids = []
 
 
 class Buffer:
@@ -65,16 +66,16 @@ def load_json(json_file):
 
 def dataprocess():
     file = sys.argv[1]
-    #print(file)
+    # print(file)
     # files.sort(key=lambda x: int(x[5:-5:])) #正确排序方式
     # files.sort(key = lambda x:int(str(x.split('.')[0]).replace('trace','')))
     # print(
     #     'modelid,layerid,cpueventname,cudatime,cudatimenooverlap, cpueventduration,cpueventsstarttime,cpueventendtime,cpucorrelationid,inputdims,'
     #     'inputproducts,inputsize,convkernelsize,bias,kernelduration,kernelstarttime,kernelendtime,correlationid,blocksperSM,'
     #     'warpsperSM,stream,grid,block,kernelname')
-    print(
-        "operatorid,operatorname,infoeventids"
-    )
+    # print(
+    #     "operatorid,operatorname,infoeventids"
+    # )
     fileid = 0
 
     with open(file, "r") as f:
@@ -183,7 +184,8 @@ def dataprocess():
                     akernel.correlationid = correlationid
                     cpueventsitem.cudaevents.append(akernel)
     operatorid = 0
-    infoeventid = 0
+    kernelid = 0
+    allocid = 0
     for cpueventsitem in cpuevents:
         # inputproducts = l_prod(cpueventsitem.inputdims[0])
         # if cpueventsitem.inputdims != "":
@@ -201,7 +203,10 @@ def dataprocess():
         mincuda = 0
         maxcuda = 0
         cudatimenooverlap = 0
+
         for cudaeventsitem in cpueventsitem.cudaevents:
+            cpueventsitem.kernelids.append(kernelid)
+            kernelid += 1
             if mincuda == 0:
                 mincuda = cudaeventsitem.starttime - profilerstarttime
             elif mincuda > cudaeventsitem.starttime - profilerstarttime:
@@ -218,12 +223,15 @@ def dataprocess():
             a = {
                 "starttime": allocevent["ts"] - profilerstarttime,
                 "address": hex(allocevent["args"]["Addr"]),
-                "size": allocevent["args"]["Bytes"],  
+                "size": allocevent["args"]["Bytes"],
                 "type": "allocate",
                 "cudatime": "",
-                "cudatimeoverlap":""
+                "cudatimeoverlap": "",
+                "eventid": allocid,
             }
             infoevents.append(a)
+            cpueventsitem.allocids.append(allocid)
+            allocid += 1
         #     print(
         #         file,
         #         ",",
@@ -241,29 +249,27 @@ def dataprocess():
                 "starttime": cudaeventsitem.starttime - profilerstarttime,
                 "cudatime": cudatime,
                 "cudatimeoverlap": cudatimenooverlap,
-                "type": "kernel-"+cudaeventsitem.name.replace(",", ";"),
-                "address":"",
-                "size":""
+                "type": "kernel-" + cudaeventsitem.name.replace(",", ";"),
+                "address": "",
+                "size": "",
+                "eventid": cpueventsitem.kernelids[i],
             }
             infoevents.append(k)
         infoevents.sort(key=myFunc1)
-        for infoevent in infoevents:
-            infoevent["id"] = infoeventid
-            cpueventsitem.infoeventids.append(infoeventid)
-            infoeventid+=1
-        print(
-            operatorid,
-            ",",
-            cpueventsitem.name,
-            # ",",
-            # cpueventsitem.duration,
-            # ",",
-            # cpueventsitem.starttime - profilerstarttime,
-            # ",",
-            # cpueventsitem.endtime - profilerstarttime,
-            ",",
-            str(cpueventsitem.infoeventids).replace(",", ";"),
-        )
+
+        # print(
+        #     operatorid,
+        #     ",",
+        #     cpueventsitem.name,
+        #     # ",",
+        #     # cpueventsitem.duration,
+        #     # ",",
+        #     # cpueventsitem.starttime - profilerstarttime,
+        #     # ",",
+        #     # cpueventsitem.endtime - profilerstarttime,
+        #     ",",
+        #     str(cpueventsitem.infoeventids).replace(",", ";"),
+        # )
         for e in infoevents:
             print(e)
 
